@@ -1,0 +1,65 @@
+//
+//  RootView.swift
+//  {{ name }}
+//
+//  Created by {{ author }} on {{ date }}
+//
+
+import SwiftUI
+
+struct RootView: View {
+    @StateObject var viewModel: RootViewModel = RootViewModel()
+
+    @State private var logInput: String = ""
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 16) {
+            HStack {
+                Text("Status: \(viewModel.isActive ? "Active" : "Inactive")")
+                    .font(.headline)
+                Spacer()
+                Button {
+                    viewModel.toggleActive()
+                } label: {
+                    Image(systemName: viewModel.isActive ? "power.circle.fill" : "power.circle")
+                        .imageScale(.large)
+                }
+            }
+
+            HStack {
+                TextField("Enter log message", text: $logInput)
+                    .textFieldStyle(.roundedBorder)
+
+                Button("Send") {
+                    guard !logInput.isEmpty else { return }
+                    viewModel.addLog(logInput)
+                    logInput = ""
+                }
+                .disabled(logInput.isEmpty)
+            }
+
+            ScrollView {
+                LazyVStack(alignment: .leading, spacing: 4) {
+                    ForEach(viewModel.logs.indices, id: \.self) { index in
+                        Text(viewModel.logs[index])
+                            .font(.system(.body, design: .monospaced))
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                    }
+                }
+            }
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+            .background(Color(.secondarySystemBackground))
+            .cornerRadius(8)
+
+            Button("Clear Logs", role: .destructive) {
+                viewModel.resetLog()
+            }
+        }
+        .padding()
+        .onAppear { viewModel.load() }
+    }
+}
+
+#Preview {
+    RootView()
+}

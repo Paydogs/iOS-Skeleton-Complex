@@ -1,0 +1,15 @@
+//
+//  LoggingActions.swift
+//  {{ name }}
+//
+//  Created by {{ author }} on {{ date }}
+//
+
+import Foundation
+
+extension AppAction {
+    static func createLogAction(from action: AppAction) -> AppAction {
+        switch action {
+        }
+    }
+}

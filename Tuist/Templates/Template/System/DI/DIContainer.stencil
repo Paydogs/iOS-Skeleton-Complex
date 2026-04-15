@@ -1,0 +1,32 @@
+//
+//  DIContainer.swift
+//  {{ name }}
+//
+//  Created by {{ author }} on {{ date }}
+//
+
+import Foundation
+
+@MainActor
+final class DIContainer {
+    static let shared = DIContainer()
+    
+    private let _actionBus: ActionBus
+    private let _actionDispatcher: ActionDispatcher
+    private let _appStore: AppStore
+
+    private init() {
+        _actionBus = ActionBus()
+        _actionDispatcher = ActionDispatcher(_actionBus)
+        _appStore = AppStore(actionBus: _actionBus,
+                             persistence: NoOpPersistence())
+    }
+    
+    var actionDispatcher: ActionDispatcher {
+        _actionDispatcher
+    }
+
+    var appStore: AppStore {
+        _appStore
+    }
+}

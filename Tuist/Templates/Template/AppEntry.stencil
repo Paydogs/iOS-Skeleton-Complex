@@ -1,0 +1,22 @@
+//
+//  {{ name }}App.swift
+//  {{ name }}
+//
+//  Created by {{ author }} on {{ date }}
+//
+
+import SwiftUI
+
+@main
+struct {{ name }}App: App {
+    @UIApplicationDelegateAdaptor(AppDelegate.self)
+    private var appDelegate
+
+    let dispatcher: ActionDispatcher = DIContainer.shared.actionDispatcher
+
+    var body: some Scene {
+        WindowGroup {
+            RootView()
+        }
+    }
+}

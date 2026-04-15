@@ -1,0 +1,14 @@
+//
+//  AppAction.swift
+//  {{ name }}
+//
+//  Created by {{ author }} on {{ date }}
+//
+import Foundation
+
+public enum AppAction: Intent {
+    case setIsActive(Bool)
+    case addToLog(String)
+    case resetLog
+    case resetStorage
+}

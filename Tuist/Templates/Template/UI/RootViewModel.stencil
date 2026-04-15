@@ -1,0 +1,56 @@
+//
+//  RootViewModel.swift
+//  {{ name }}
+//
+//  Created by {{ author }} on {{ date }}
+//
+
+import Foundation
+
+@MainActor
+final class RootViewModel: ObservableObject {
+    private let store = DIContainer.shared.appStore
+    private let dispatcher = DIContainer.shared.actionDispatcher
+    
+    @Published private(set) var isActive: Bool = false
+    @Published private(set) var logs: [String] = []
+    
+    private var observationTask: Task<Void, Never>?
+    
+    func load() {
+        observationTask?.cancel()
+        observationTask = Task { [weak self] in
+            guard let stream = await self?.store.stateStream() else { return }
+            for await state in stream {
+                // due to lack of @Observable
+                await MainActor.run { [weak self] in
+                    guard let self else { return }
+                    self.isActive = state.isActive
+                    self.logs = state.logs
+                }
+            }
+        }
+    }
+    
+    deinit {
+        observationTask?.cancel()
+    }
+    
+    func toggleActive() {
+        let action = AppAction.setIsActive(!isActive)
+        dispatcher.dispatch(action)
+    }
+
+    func addLog(_ log: String) {
+        let action = AppAction.addToLog(log)
+        dispatcher.dispatch(action)
+    }
+    
+    func resetLog() {
+        dispatcher.dispatch(AppAction.resetLog)
+    }
+
+    func resetStorage() {
+        dispatcher.dispatch(AppAction.resetStorage)
+    }
+}
