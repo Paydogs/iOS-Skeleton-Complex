@@ -8,6 +8,7 @@ let authorAttribute: Template.Attribute = .required("author")
 let projectItems: [Template.Item] = [
     .file(path: "\(nameAttribute)/Workspace.swift",        templatePath: "Workspace.stencil"),
     .file(path: "\(nameAttribute)/Project.swift",          templatePath: "Project.stencil"),
+    .file(path: "\(nameAttribute)/CLAUDE.md",              templatePath: "CLAUDE.md.stencil"),
 ]
 
 let appItems: [Template.Item] = [
@@ -24,6 +25,10 @@ let appItems: [Template.Item] = [
     .file(path: "\(nameAttribute)/Application/System/Store/AppStore/AppAction.swift",                           templatePath: "System/Store/AppStore/AppAction.stencil"),
     .file(path: "\(nameAttribute)/Application/System/Store/AppStore/AppState.swift",                            templatePath: "System/Store/AppStore/AppState.stencil"),
     .file(path: "\(nameAttribute)/Application/System/Store/AppStore/AppStore.swift",                            templatePath: "System/Store/AppStore/AppStore.stencil"),
+    .file(path: "\(nameAttribute)/Application/System/Store/AppStore/AppActionHandler.swift",                    templatePath: "System/Store/AppStore/AppActionHandler.stencil"),
+    .file(path: "\(nameAttribute)/Application/System/Store/AppStore/LogState.swift",                            templatePath: "System/Store/AppStore/LogState.stencil"),
+    .file(path: "\(nameAttribute)/Application/System/Store/AppStore/LoggingAction.swift",                       templatePath: "System/Store/AppStore/LoggingAction.stencil"),
+    .file(path: "\(nameAttribute)/Application/System/Store/AppStore/LoggingHandler.swift",                      templatePath: "System/Store/AppStore/LoggingHandler.stencil"),
     .file(path: "\(nameAttribute)/Application/System/Store/BaseStore.swift",                                    templatePath: "System/Store/BaseStore.stencil"),
     .file(path: "\(nameAttribute)/Application/System/Store/BaseStore+Extensions.swift",                         templatePath: "System/Store/BaseStore+Extensions.stencil"),
     .file(path: "\(nameAttribute)/Application/UI/RootView.swift",                                               templatePath: "UI/RootView.stencil"),

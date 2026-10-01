@@ -5,59 +5,31 @@
 //  Created by {{ author }} on {{ date }}
 //
 
+import Foundation
+
+// MARK: KeyPath observation
 public extension BaseStore {
-    func stream<A: Equatable>(
-        _ kp1: KeyPath<State, A>
+    /// Emits the current state, then re-emits only when one of the
+    /// watched keypaths' values changes. Variadic via parameter packs,
+    /// so any number of fields can be observed in a single call.
+    func stream<each Property: Equatable & Sendable>(
+        _ paths: repeat KeyPath<State, each Property>
     ) -> AsyncStream<State> {
         AsyncStream { continuation in
             let task = Task {
-                var prev: State? = nil
+                var prev: State?
                 for await state in self.stateStream() {
                     defer { prev = state }
-                    guard let prev else { continuation.yield(state); continue }
-                    guard state[keyPath: kp1] != prev[keyPath: kp1] else { continue }
-                    continuation.yield(state)
-                }
-            }
-            continuation.onTermination = { _ in task.cancel() }
-        }
-    }
-    
-    func stream<A: Equatable, B: Equatable>(
-        _ kp1: KeyPath<State, A>,
-        _ kp2: KeyPath<State, B>
-    ) -> AsyncStream<State> {
-        AsyncStream { continuation in
-            let task = Task {
-                var prev: State? = nil
-                for await state in self.stateStream() {
-                    defer { prev = state }
-                    guard let prev else { continuation.yield(state); continue }
-                    guard state[keyPath: kp1] != prev[keyPath: kp1] ||
-                            state[keyPath: kp2] != prev[keyPath: kp2]
-                    else { continue }
-                    continuation.yield(state)
-                }
-            }
-            continuation.onTermination = { _ in task.cancel() }
-        }
-    }
-    
-    func stream<A: Equatable, B: Equatable, C: Equatable>(
-        _ kp1: KeyPath<State, A>,
-        _ kp2: KeyPath<State, B>,
-        _ kp3: KeyPath<State, C>
-    ) -> AsyncStream<State> {
-        AsyncStream { continuation in
-            let task = Task {
-                var prev: State? = nil
-                for await state in self.stateStream() {
-                    defer { prev = state }
-                    guard let prev else { continuation.yield(state); continue }
-                    guard state[keyPath: kp1] != prev[keyPath: kp1] ||
-                            state[keyPath: kp2] != prev[keyPath: kp2] ||
-                            state[keyPath: kp3] != prev[keyPath: kp3]
-                    else { continue }
+                    guard let prevState = prev else {
+                        continuation.yield(state)
+                        continue
+                    }
+                    var changed = false
+                    func check<T: Equatable>(_ kp: KeyPath<State, T>) {
+                        changed = changed || (state[keyPath: kp] != prevState[keyPath: kp])
+                    }
+                    _ = (repeat check(each paths))
+                    guard changed else { continue }
                     continuation.yield(state)
                 }
             }

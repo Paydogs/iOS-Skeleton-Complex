@@ -1,0 +1,72 @@
+# CLAUDE.md — {{ name }}
+
+SwiftUI + MVVM app scaffolded with Tuist, using a unidirectional, Redux-like store.
+
+## Build workflow
+- Tuist + SPM. `*.xcodeproj` / `*.xcworkspace` are **generated and gitignored — never commit
+  them**. Regenerate after adding or removing source files:
+  `tuist install && tuist generate` (the install step is required, or SPM bundles don't resolve).
+- Source files are globbed in `Project.swift` (`Application/**/*.swift`), so new files are
+  picked up on regenerate.
+- Deps are declared in `Tuist/Package.swift`, wired into targets via `.external(name:)` in
+  `Project.swift`.
+
+## Architecture: the unit of change is an Action
+State can only be mutated by dispatching an Action. The pipeline:
+
+```
+View → ViewModel → ActionDispatcher.dispatch(Action) → ActionBus (routes by action TYPE)
+     → XHandler.handleAction → BaseStore.update → subscribers re-emit
+```
+
+- **Actions** are enums conforming to the `Intent` marker protocol, named for what happened
+  or should happen — never with an `on` prefix (reserved for callback closures).
+- **`BaseStore<AppState>`** (actor) is the sole owner of state and the only type with
+  `update`. It is built by a `private` DI Factory, so a reader cannot resolve it.
+- **`AppStore`** is the concrete read-only face (`currentState` / `stateStream` /
+  `stream(_:)`) that ViewModels inject. A reader cannot mutate by construction.
+- **Writers are handlers**: `AppActionHandler` plus one `XHandler` per action enum, each
+  holding the `BaseStore` and registered on the `ActionBus`. One handler per action type,
+  last registration wins. Handlers never read state — they only mutate.
+- **`ActionDispatcher`** is dispatch-only (`ActionDispatching`); dispatch is fire-and-forget.
+  The bus logs an error when an action lands with no handler registered — if a dispatched
+  action does nothing, check that its handler is resolved in `Container.preInit()`.
+- DI is **Factory**: factories live in `System/DI/DIContainer.swift` as `extension Container`
+  with `.cached`; ViewModels inject via `@Injected`.
+
+### Extending the store: a new domain is three files
+1. a substate struct in `System/Store/AppStore/` (`LogState`), composed into `AppState`;
+2. an action enum conforming to `Intent` (`LoggingAction`);
+3. an `XHandler` holding the shared `BaseStore`, registered on the bus (`LoggingHandler`),
+   resolved in `Container.preInit()` so registration happens before any dispatch.
+
+Nothing else in the pipeline changes. The sample app's log list is exactly this shape —
+copy it.
+
+## Style rules
+- **`// MARK:`** sits flush above the code it labels — no empty line in between. Group
+  functions into extensions by functionality, each under a MARK.
+- **Imports:** Apple frameworks first, then 3rd-party in alphabetical order.
+- **Naming:** types `UpperCamelCase`; protocols by capability (`-ing`/`-able`/role noun).
+  Handlers are `XHandler`; "Store" means state owner/read face only — never `XStore` for a
+  mutator, never "reducer". Booleans get `is`/`has`.
+- **`switch` exhaustively** over closed domains — no `default`, so new cases become compile
+  errors. Derived predicates live as computed helpers on the enum, not scattered switches.
+- **Minimal surface:** public API kept to a protocol-described minimum; the rest in
+  `private`/`fileprivate` extensions.
+- **Comments:** sparing, explain the *why*, 2–3 lines max. No doc comment on every member.
+- Avoid `$0` shorthand — name closure parameters with their types.
+
+## Concurrency
+- Only modern Swift: `actor`, `async`/`await`, structured concurrency, `AsyncStream`,
+  parameter packs. **No Combine, no self-authored completion handlers** — bridge delegate or
+  callback APIs through an `AsyncStream` continuation.
+- Types crossing isolation boundaries are `Sendable`; shared mutable state lives in actors;
+  UI state on `@MainActor`. `nonisolated(unsafe)` only as a last resort.
+- Long-lived `Task`s are stored and cancelled in `deinit`.
+
+## Persistence
+`BaseStore` debounces saves. On backgrounding or termination dispatch an action whose handler
+calls `store.flush()`, or a debounced write is silently lost. The `BaseStore` factory ships
+with `NoOpPersistence` — swap in `FilePersistence`/`UserDefaultsPersistence` when real
+persistence is needed.

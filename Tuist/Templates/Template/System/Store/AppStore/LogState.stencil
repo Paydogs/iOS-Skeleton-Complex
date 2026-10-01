@@ -1,0 +1,18 @@
+//
+//  LogState.swift
+//  {{ name }}
+//
+//  Created by {{ author }} on {{ date }}
+//
+
+import Foundation
+
+/// A domain substate: `AppState` is composed of these — one struct per domain — instead of
+/// growing into a flat bag of properties.
+public struct LogState: StoreState {
+    public var entries: [String]
+
+    public init(entries: [String] = []) {
+        self.entries = entries
+    }
+}

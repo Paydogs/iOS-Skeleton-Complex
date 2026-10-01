@@ -7,69 +7,32 @@
 
 import Foundation
 
-public final class AppStore: ActionHandler {
-    private let store: BaseStore<AppState, AppAction>
-    
-    public init(actionBus: ActionSource, persistence: (any StatePersisting<AppState>)? = nil, initialState: AppState = AppState()) {
-        self.store = BaseStore(actionBus: actionBus, persistence: persistence, initialState: initialState)
-        actionBus.register(AppAction.self, handler: self)
+/// The concrete, read-only face of the app's state — what every ViewModel and read-only
+/// service holds. Owns a `BaseStore` (the state actor) and forwards only `currentState` /
+/// `stateStream` / `stream(_:)`; it deliberately exposes **no** `update`. So a holder of
+/// `AppStore` can read `AppState` but cannot mutate it — the "state is only mutated by
+/// dispatching an Action" rule is enforced by this surface, not by convention.
+///
+/// The only thing that mutates state is the action-handling layer (`AppActionHandler` and
+/// per-domain handlers), which hold the `BaseStore` directly. The `BaseStore` itself is
+/// built by a private DI factory, so a reader has no way to resolve it and grab the
+/// `update` surface — `AppStore` is the only handle the rest of the app gets.
+public final class AppStore: Sendable {
+    private let base: BaseStore<AppState>
+
+    public init(baseStore: BaseStore<AppState>) {
+        self.base = baseStore
     }
-    
-    // MARK: - Read-only interface
-    
-    var currentState: AppState {
-        get async { await store.currentState }
-    }
-    
-    func stateStream() async -> AsyncStream<AppState> {
-        await store.stateStream()
-    }
-    
-    func stream<A: Equatable>(_ kp1: KeyPath<AppState, A>) async -> AsyncStream<AppState> {
-        await store.stream(kp1)
-    }
-    
-    func stream<A: Equatable, B: Equatable>(
-        _ kp1: KeyPath<AppState, A>,
-        _ kp2: KeyPath<AppState, B>
+
+    public var currentState: AppState { get async { await base.currentState } }
+
+    // `stateStream`/`stream` are actor-isolated on `BaseStore`, so the wrappers hop onto
+    // the actor — hence `async`.
+    public func stateStream() async -> AsyncStream<AppState> { await base.stateStream() }
+
+    public func stream<each Property: Equatable & Sendable>(
+        _ paths: repeat KeyPath<AppState, each Property>
     ) async -> AsyncStream<AppState> {
-        await store.stream(kp1, kp2)
-    }
-    
-    func stream<A: Equatable, B: Equatable, C: Equatable>(
-        _ kp1: KeyPath<AppState, A>,
-        _ kp2: KeyPath<AppState, B>,
-        _ kp3: KeyPath<AppState, C>
-    ) async -> AsyncStream<AppState> {
-        await store.stream(kp1, kp2, kp3)
-    }
-    
-    // MARK: - Action handling
-    
-    public func handleAction(_ action: any Intent) async {
-        guard let action = action as? AppAction else { return }
-        switch action {
-        case .setIsActive(let value):
-            await store.update { state in
-                Log.debug("Setting new isActive flag")
-                state.isActive = value
-            }
-        case .addToLog(let message):
-            await store.update { state in
-                Log.debug("Adding log")
-                state.logs.append(message)
-            }
-        case .resetLog:
-            await store.update { state in
-                Log.debug("Resetting logs")
-                state.logs.removeAll()
-            }
-        // Reset all data
-        case .resetStorage:
-            await store.update { state in
-                Log.debug("Resetting storage")
-                state.logs.removeAll()
-            }
-        }
+        await base.stream(repeat each paths)
     }
 }

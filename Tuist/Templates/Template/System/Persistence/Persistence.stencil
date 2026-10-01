@@ -11,8 +11,11 @@ import CoreData
 // Protocol
 public protocol StatePersisting<State>: Sendable {
     associatedtype State: Sendable
-    
+
     func save(_ state: State) async throws
+    /// A save that skips no write. Called when the process may not survive (backgrounding,
+    /// termination), so state a plain save leaves unwritten still reaches disk.
+    func flush(_ state: State) async throws
     func load() async throws -> State?
     func clear() async throws
 }
@@ -20,6 +23,7 @@ public protocol StatePersisting<State>: Sendable {
 // No-op
 struct NoOpPersistence<State: Sendable>: StatePersisting {
     func save(_ state: State) async throws {}
+    func flush(_ state: State) async throws {}
     func load() async throws -> State? { nil }
     func clear() async throws {}
 }
@@ -27,17 +31,21 @@ struct NoOpPersistence<State: Sendable>: StatePersisting {
 // File-based
 struct FilePersistence<State: Sendable & Codable>: StatePersisting {
     let url: URL
-    
+
     func save(_ state: State) async throws {
         let data = try JSONEncoder().encode(state)
         try data.write(to: url, options: .atomic)
     }
-    
+
+    func flush(_ state: State) async throws {
+        try await save(state)
+    }
+
     func load() async throws -> State? {
         guard let data = try? Data(contentsOf: url) else { return nil }
         return try JSONDecoder().decode(State.self, from: data)
     }
-    
+
     func clear() async throws {
         try FileManager.default.removeItem(at: url)
     }
@@ -47,22 +55,26 @@ struct FilePersistence<State: Sendable & Codable>: StatePersisting {
 struct UserDefaultsPersistence<State: Sendable & Codable>: StatePersisting {
     let key: String
     nonisolated(unsafe) let defaults: UserDefaults
-    
+
     init(key: String, defaults: UserDefaults = .standard) {
         self.key = key
         self.defaults = defaults
     }
-    
+
     func save(_ state: State) async throws {
         let data = try JSONEncoder().encode(state)
         defaults.set(data, forKey: key)
     }
-    
+
+    func flush(_ state: State) async throws {
+        try await save(state)
+    }
+
     func load() async throws -> State? {
         guard let data = defaults.data(forKey: key) else { return nil }
         return try JSONDecoder().decode(State.self, from: data)
     }
-    
+
     func clear() async throws {
         defaults.removeObject(forKey: key)
     }

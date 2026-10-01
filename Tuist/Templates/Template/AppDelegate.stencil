@@ -5,10 +5,11 @@
 //  Created by {{ author }} on {{ date }}
 //
 
+import FactoryKit
 import UIKit
 
 final class AppDelegate: NSObject, UIApplicationDelegate {
-   
+
     func application(
         _ application: UIApplication,
         didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]?
@@ -17,6 +18,9 @@ final class AppDelegate: NSObject, UIApplicationDelegate {
 
         AppleLoggerAdapter.bootstrapStandardOutputWithLogLevel(level: .trace)
         Log.install(AppleLoggerAdapter())
+
+        // Registers every action handler on the bus before any action can be dispatched.
+        Container.shared.preInit()
 
         return true
     }
@@ -28,6 +32,6 @@ final class AppDelegate: NSObject, UIApplicationDelegate {
     ) {
 //        appController?.didRegisterForPush(deviceToken: deviceToken)
     }
-    
+
     // Push, background tasks, deep links go here
 }

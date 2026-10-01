@@ -1,0 +1,33 @@
+//
+//  AppActionHandler.swift
+//  {{ name }}
+//
+//  Created by {{ author }} on {{ date }}
+//
+
+import Foundation
+
+/// The `ActionHandler` registered on the bus for `AppAction`. Holds the shared `BaseStore`
+/// directly, so its only job is turning `AppAction`s into state mutations. Reads come from
+/// `AppStore` (the read face); this type never reads. Per-domain action enums get their own
+/// `XHandler` peers (`LoggingHandler`) — one handler per action type, same bus, same store.
+final class AppActionHandler: ActionHandler {
+    private let store: BaseStore<AppState>
+
+    init(actionBus: ActionSource, store: BaseStore<AppState>) {
+        self.store = store
+        actionBus.register(AppAction.self, handler: self)
+    }
+
+    // MARK: Action handling
+    func handleAction(_ action: any Intent) async {
+        guard let action = action as? AppAction else { return }
+        switch action {
+        case .setIsActive(let value):
+            await store.update { state in
+                Log.debug("[STORE][isActive] \(value)")
+                state.isActive = value
+            }
+        }
+    }
+}

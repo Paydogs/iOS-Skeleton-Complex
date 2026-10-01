@@ -1,0 +1,38 @@
+//
+//  LoggingHandler.swift
+//  {{ name }}
+//
+//  Created by {{ author }} on {{ date }}
+//
+
+import Foundation
+
+/// The handler for `LoggingAction` — a peer of `AppActionHandler`: same shared `BaseStore`,
+/// own action enum registered on the bus. A new domain is a new substate struct in
+/// `AppState`, a new action enum, and a new handler like this one; nothing else in the
+/// pipeline changes.
+final class LoggingHandler: ActionHandler {
+    private let store: BaseStore<AppState>
+
+    init(actionBus: ActionSource, store: BaseStore<AppState>) {
+        self.store = store
+        actionBus.register(LoggingAction.self, handler: self)
+    }
+
+    // MARK: Action handling
+    func handleAction(_ action: any Intent) async {
+        guard let action = action as? LoggingAction else { return }
+        switch action {
+        case .addEntry(let message):
+            await store.update { state in
+                Log.debug("[STORE][log.entries] append")
+                state.log.entries.append(message)
+            }
+        case .clearEntries:
+            await store.update { state in
+                Log.debug("[STORE][log.entries] clear")
+                state.log.entries.removeAll()
+            }
+        }
+    }
+}

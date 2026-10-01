@@ -7,38 +7,31 @@
 
 import Foundation
 
-public typealias PeerIdentifier = String
-
+/// The single source of truth, composed of one substate struct per domain (`LogState`, …).
 public struct AppState: StoreState {
     public var isActive: Bool
-    public var logs: [String]
+    public var log: LogState
 
     public init(isActive: Bool = false,
-                logs: [String] = []) {
+                log: LogState = LogState()) {
         self.isActive = isActive
-        self.logs = logs
+        self.log = log
     }
 
-    ///
     /// These values will be persisted
-    ///
     private enum CodingKeys: String, CodingKey {
         case isActive
     }
 
-    ///
-    /// This controls when the system needs to save
-    ///
+    /// Controls when the store saves
     public func needsPersistence(comparedTo previous: AppState) -> Bool {
         self.isActive != previous.isActive
     }
 
-    ///
     /// Init from stored persisted data
-    ///
     public init(from decoder: Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
         isActive = (try? container.decode(Bool.self, forKey: .isActive)) ?? false
-        logs = []
+        log = LogState()
     }
 }

@@ -6,27 +6,52 @@
 //
 
 import Foundation
+import FactoryKit
 
-@MainActor
-final class DIContainer {
-    static let shared = DIContainer()
-    
-    private let _actionBus: ActionBus
-    private let _actionDispatcher: ActionDispatcher
-    private let _appStore: AppStore
-
-    private init() {
-        _actionBus = ActionBus()
-        _actionDispatcher = ActionDispatcher(_actionBus)
-        _appStore = AppStore(actionBus: _actionBus,
-                             persistence: NoOpPersistence())
-    }
-    
-    var actionDispatcher: ActionDispatcher {
-        _actionDispatcher
+extension Container {
+    /// Resolves the read face (which builds the shared `BaseStore` and starts its load),
+    /// then every handler, so each is registered for its action enum on the bus before any
+    /// dispatch lands. Called once from the AppDelegate. New domains: add the handler here.
+    func preInit() {
+        _ = appStore()
+        _ = appActionHandler()
+        _ = loggingHandler()
     }
 
-    var appStore: AppStore {
-        _appStore
+    var actionBus: Factory<ActionBus> {
+        Factory(self) { ActionBus() }
+            .cached
+    }
+
+    var actionDispatcher: Factory<ActionDispatcher> {
+        Factory(self) { ActionDispatcher(self.actionBus()) }
+            .cached
+    }
+
+    var appStore: Factory<AppStore> {
+        Factory(self) { AppStore(baseStore: self.baseStore()) }
+            .cached
+    }
+
+    var appActionHandler: Factory<AppActionHandler> {
+        Factory(self) { AppActionHandler(actionBus: self.actionBus(), store: self.baseStore()) }
+            .cached
+    }
+
+    var loggingHandler: Factory<LoggingHandler> {
+        Factory(self) { LoggingHandler(actionBus: self.actionBus(), store: self.baseStore()) }
+            .cached
+    }
+}
+
+private extension Container {
+    // Private so nothing outside DI can resolve the mutable store — the rest of the app
+    // gets `appStore` (read-only) and `actionDispatcher` (dispatch-only).
+    var baseStore: Factory<BaseStore<AppState>> {
+        Factory(self) {
+            // Swap in FilePersistence/UserDefaultsPersistence once real persistence is needed.
+            BaseStore(persistence: NoOpPersistence(), initialState: AppState())
+        }
+        .cached
     }
 }

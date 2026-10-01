@@ -17,25 +17,30 @@ public protocol StorableProperty: Codable, Hashable, Equatable, Sendable {}
 public protocol StoreProtocol: Actor {
     associatedtype StoreState: Sendable & Equatable
 
-    var currentState: StoreState { get }
+    var currentState: StoreState { get async }
     func stateStream() -> AsyncStream<StoreState>
 }
 
 // MARK: Public BaseStore implementation
-public final actor BaseStore<State: StoreState, Action: Intent>: StoreProtocol {
-    public var currentState: State { _state }
+public final actor BaseStore<State: StoreState>: StoreProtocol {
+    public var currentState: State {
+        get async {
+            if !loadComplete {
+                await waitForLoad()
+            }
+            return _state
+        }
+    }
     public var subscriberCount: Int { subscribers.count }
-    
-    private var _actionBus: ActionSource
+
     private var _persistence: (any StatePersisting<State>)?
     private var _state: State
-    private var subscribers: [UUID: AsyncStream<State>.Continuation] = [:]
     private var saveTask: Task<Void, Never>?
+    private var subscribers: [UUID: AsyncStream<State>.Continuation] = [:]
 
     private var loadComplete = false
 
-    public init(actionBus: ActionSource, persistence: (any StatePersisting<State>)? = nil, initialState: State) {
-        _actionBus = actionBus
+    public init(persistence: (any StatePersisting<State>)? = nil, initialState: State) {
         _persistence = persistence
         _state = initialState
 
@@ -46,7 +51,7 @@ public final actor BaseStore<State: StoreState, Action: Intent>: StoreProtocol {
                 } catch {
                     Log.error("Loading error: \(error)")
                     Log.error("Clearing...")
-                    try await clear()
+                    try? await clear()
                 }
                 await self.markLoadComplete()
             }
@@ -65,12 +70,9 @@ public final actor BaseStore<State: StoreState, Action: Intent>: StoreProtocol {
     public func stateStream() -> AsyncStream<State> {
         AsyncStream { continuation in
             let subscriber = UUID()
-            Log.debug("New subscriber: \(subscriber)")
             subscribers[subscriber] = continuation
-            Log.debug("Subscriber count: \(subscribers.count)")
 
             continuation.onTermination = { [weak self] _ in
-                Log.debug("Removing subscriber: \(subscriber)")
                 Task { await self?.removeSubscriber(subscriber) }
             }
 
@@ -85,7 +87,7 @@ public final actor BaseStore<State: StoreState, Action: Intent>: StoreProtocol {
         var newState = _state
         mutation(&newState)
         guard newState != _state else { return }
-        
+
         let oldState = _state
         _state = newState
         for (_, subscriber) in subscribers {
@@ -95,8 +97,18 @@ public final actor BaseStore<State: StoreState, Action: Intent>: StoreProtocol {
             debounceSave()
         }
     }
+
+    /// Writes the current state out now instead of waiting out the save debounce.
+    /// Call it when the process may not survive (backgrounding, termination) — a save
+    /// left pending in the debounce would otherwise be lost.
+    public func flush() async {
+        saveTask?.cancel()
+        saveTask = nil
+        try? await _persistence?.flush(_state)
+    }
 }
 
+// MARK: Private
 private extension BaseStore {
     func markLoadComplete() {
         loadComplete = true
@@ -108,10 +120,6 @@ private extension BaseStore {
         }
     }
 
-    func save() async {
-        try? await _persistence?.save(_state)
-    }
-    
     func load() async throws {
         if let saved = try await _persistence?.load(), saved != _state {
             _state = saved
@@ -120,11 +128,11 @@ private extension BaseStore {
             }
         }
     }
-    
+
     func clear() async throws {
         try await _persistence?.clear()
     }
-    
+
     func debounceSave() {
         saveTask?.cancel()
         saveTask = Task {
@@ -134,12 +142,13 @@ private extension BaseStore {
             Log.debug("Changes saved...")
         }
     }
-    
+
     func removeSubscriber(_ id: UUID) {
         subscribers.removeValue(forKey: id)
     }
 }
 
+// MARK: StoreState default persistence
 extension StoreState {
     public func needsPersistence(comparedTo previous: Self) -> Bool { self != previous }
 }

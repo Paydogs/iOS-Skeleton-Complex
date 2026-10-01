@@ -6,9 +6,8 @@
 //
 import Foundation
 
+/// Cross-cutting, app-level actions. Per-domain actions get their own enum
+/// (`LoggingAction`); the bus routes by enum type, one handler per enum.
 public enum AppAction: Intent {
     case setIsActive(Bool)
-    case addToLog(String)
-    case resetLog
-    case resetStorage
 }

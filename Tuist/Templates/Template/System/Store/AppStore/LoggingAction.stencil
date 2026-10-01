@@ -1,0 +1,15 @@
+//
+//  LoggingAction.swift
+//  {{ name }}
+//
+//  Created by {{ author }} on {{ date }}
+//
+
+import Foundation
+
+/// One action enum per domain. The `ActionBus` routes by enum type, so every enum has
+/// exactly one registered handler.
+public enum LoggingAction: Intent {
+    case addEntry(String)
+    case clearEntries
+}
